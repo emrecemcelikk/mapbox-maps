@@ -1,19 +1,18 @@
 # Customization:
-#  $RNMapboxMapsVersion - version specification ("~> 10.4.3", "~> 5.9.0" or "exactVersion 5.12.1" mapblibre/SPM)
+#  $RNMapboxMapsVersion - version specification ("~> 11.15.0", "= 11.15.0")
 #  $RNMapboxMapsSwiftPackageManager can be either
-#     "manual" - you're responsible for the Mapbox lib dependency either using cocoapods or SPM
-#     Hash - ```
+#     "manual" - you're responsible for the Mapbox lib dependency (SPM or pods yourself)
+#     Hash - e.g.
 #         {
-#           url: "https://github.com/maplibre/maplibre-gl-native-distribution",
+#           url: "https://github.com/mapbox/mapbox-maps-ios.git",
 #           requirement: {
 #             kind: 'exactVersion',
-#             version: 5.12.1,
+#             version: "11.15.0",
 #           },
-#           product_name: "Mapbox"
+#           product_name: "MapboxMaps"
 #         }
-#         ```
-#  $RNMapboxMapsDownloadToken - *expo only* download token
-#  $RNMapboxMapsCustomPods - use a custom pod for mapbox libs
+#  $RNMapboxMapsDownloadToken - *expo only* download token (for CocoaPods downloads)
+#  $RNMapboxMapsCustomPods - use custom pods for Mapbox libs (CocoaPods path)
 
 require 'json'
 
@@ -21,7 +20,6 @@ package = JSON.parse(File.read(File.join(__dir__, 'package.json')))
 
 ## Warning: these lines are scanned by autogenerate.js
 rnMapboxMapsDefaultMapboxVersion = package['mapbox']['ios']
-
 rnMapboxMapsDefaultImpl = 'mapbox'
 
 $RNMapboxMaps = Object.new
@@ -42,40 +40,37 @@ unless new_arch_enabled
 end
 
 # DEPRECATIONS
-
-if $RNMBGL_Use_SPM
+if defined?($RNMBGL_Use_SPM) && $RNMBGL_Use_SPM
   abort "Error: $RNMBGL_Use_SPM is deprecated - use $RNMapboxMapsSwiftPackageManager"
 end
 
-if $RNMBGL_USE_V10
+if defined?($RNMBGL_USE_V10) && $RNMBGL_USE_V10
   abort "Error: $RNMBGL_USE_V10 is deprecated - this is the default now"
 end
 
-if $RNMBGL_USE_MAPLIBRE
-  abort "Error: $RNMBGL_USE_MAPLIBRE is deprecated no mapblire is supported"
+if defined?($RNMBGL_USE_MAPLIBRE) && $RNMBGL_USE_MAPLIBRE
+  abort "Error: $RNMBGL_USE_MAPLIBRE is deprecated no maplibre is supported"
 end
 
 if ENV.has_key?("REACT_NATIVE_MAPBOX_MAPBOX_IOS_VERSION")
   abort "Error: REACT_NATIVE_MAPBOX_MAPBOX_IOS_VERSION env is deprecated please use `$RNMapboxMapsVersion = \"#{ENV['REACT_NATIVE_MAPBOX_MAPBOX_IOS_VERSION']}\"`"
 end
 
-if $ReactNativeMapboxGLIOSVersion
+if defined?($ReactNativeMapboxGLIOSVersion) && $ReactNativeMapboxGLIOSVersion
   abort "Error: $ReactNativeMapboxGLIOSVersion is deprecated use we default to mapbox now"
 end
 
 $RNMBGL = Object.new
-
-def $RNMBGL.pre_install(installer)
+def $RNMBGL.pre_install(_installer)
   abort "WARNING: $RNMBGL.pre_install is removed - use $RNMapboxMaps.pre_install"
 end
-
-def $RNMBGL.post_install(installer)
+def $RNMBGL.post_install(_installer)
   abort "WARNING: $RNMBGL.post_install is removed - use $RNMapboxMaps.post_install"
 end
 
 # --
 
-$RNMapboxMapsImpl ||= 'mapbox'
+$RNMapboxMapsImpl ||= rnMapboxMapsDefaultImpl
 
 case $RNMapboxMapsImpl
 when 'mapbox'
@@ -90,7 +85,7 @@ else
 end
 
 if $RNMapboxMapsUseV11 != nil
-  warn "WARNING: $RNMapboxMapsUseV11 is deprecated just set $RNMapboxMapsVersion to '= 11.15.0"
+  warn "WARNING: $RNMapboxMapsUseV11 is deprecated just set $RNMapboxMapsVersion to '= 11.15.0'"
   $RNMapboxMapsUseV11Imp = $RNMapboxMapsUseV11
 end
 
@@ -104,11 +99,12 @@ end
 
 def $RNMapboxMaps._check_no_mapbox_spm(project)
   pkg_class = Xcodeproj::Project::Object::XCRemoteSwiftPackageReference
-  ref_class = Xcodeproj::Project::Object::XCSwiftPackageProductDependency
-  pkg = project.root_object.package_references.find { |p| p.class == pkg_class && [
-    "https://github.com/maplibre/maplibre-gl-native-distribution",
-    "https://github.com/mapbox/mapbox-maps-ios.git"
-  ].include?(p.repositoryURL) }
+  pkg = project.root_object.package_references.find do |p|
+    p.class == pkg_class && [
+      "https://github.com/maplibre/maplibre-gl-native-distribution",
+      "https://github.com/mapbox/mapbox-maps-ios.git"
+    ].include?(p.repositoryURL)
+  end
   if pkg
     puts "!!! Warning: Duplicate Mapbox dependency found, it's consumed by both SwiftPackageManager and CocoaPods"
   end
@@ -117,6 +113,7 @@ end
 def $RNMapboxMaps._add_spm_to_target(project, target, url, requirement, product_name)
   pkg_class = Xcodeproj::Project::Object::XCRemoteSwiftPackageReference
   ref_class = Xcodeproj::Project::Object::XCSwiftPackageProductDependency
+
   pkg = project.root_object.package_references.find { |p| p.class == pkg_class && p.repositoryURL == url }
   if !pkg
     pkg = project.new(pkg_class)
@@ -124,6 +121,7 @@ def $RNMapboxMaps._add_spm_to_target(project, target, url, requirement, product_
     pkg.requirement = requirement
     project.root_object.package_references << pkg
   end
+
   ref = target.package_product_dependencies.find { |r| r.class == ref_class && r.package == pkg && r.product_name == product_name }
   if !ref
     ref = project.new(ref_class)
@@ -134,25 +132,26 @@ def $RNMapboxMaps._add_spm_to_target(project, target, url, requirement, product_
 end
 
 def $RNMapboxMaps._add_compiler_flags(sp, extra_flags)
-  exisiting_flags = sp.attributes_hash["compiler_flags"]
-  if exisiting_flags.present?
-    sp.compiler_flags = exisiting_flags + " #{extra_flags}"
+  existing_flags = sp.attributes_hash["compiler_flags"]
+  if existing_flags && !existing_flags.to_s.empty?
+    sp.compiler_flags = "#{existing_flags} #{extra_flags}"
   else
     sp.compiler_flags = extra_flags
   end
 end
 
-def $RNMapobxMaps._rn_72_or_earlier()
+def $RNMapboxMaps._rn_72_or_earlier?
   rn_version_full = JSON.parse(File.read("node_modules/react-native/package.json"))['version']
   rn_major_minor = rn_version_full.split('.')[0...2].map(&:to_i)
-  return (rn_major_minor <=> [0,72]) <= 0
+  (rn_major_minor <=> [0, 72]) <= 0
 rescue
   false
 end
 
 def $RNMapboxMaps.post_install(installer)
-  map_pod = installer.pod_targets.find {|p| p.name == "MapboxMaps" }
+  map_pod = installer.pod_targets.find { |p| p.name == "MapboxMaps" }
   use_v11 = $RNMapboxMapsUseV11Imp || (map_pod && map_pod.version.split('.')[0].to_i >= 11)
+
   if use_v11
     installer.pods_project.build_configurations.each do |config|
       config.build_settings['OTHER_SWIFT_FLAGS'] ||= ['$(inherited)', '-D RNMBX_11']
@@ -164,33 +163,27 @@ def $RNMapboxMaps.post_install(installer)
 
     spm_spec = $RNMapboxMapsSwiftPackageManager
     project = installer.pods_project
-    self._add_spm_to_target(
-      project,
-      project.targets.find { |t| t.name == "rnmapbox-maps"},
-      spm_spec[:url],
-      spm_spec[:requirement],
-      spm_spec[:product_name]
-    )
 
-    installer.aggregate_targets.group_by(&:user_project).each do |project, targets|
-      targets.each do |target|
-        target.user_targets.each do |user_target|
-          self._add_spm_to_target(
-            project,
-            user_target,
-            spm_spec[:url],
-            spm_spec[:requirement],
-            spm_spec[:product_name]
-          )
+    # Attach SPM package to the RNMBX pod target as well (so the Pod target can import it)
+    rnmbx_target = project.targets.find { |t| t.name == "rnmapbox-maps" }
+    if rnmbx_target
+      self._add_spm_to_target(project, rnmbx_target, spm_spec[:url], spm_spec[:requirement], spm_spec[:product_name])
+    end
+
+    # Attach SPM package to all app/user targets
+    installer.aggregate_targets.group_by(&:user_project).each do |user_project, targets|
+      targets.each do |agg_target|
+        agg_target.user_targets.each do |user_target|
+          self._add_spm_to_target(user_project, user_target, spm_spec[:url], spm_spec[:requirement], spm_spec[:product_name])
         end
       end
     end
   else
     self._check_no_mapbox_spm(installer.pods_project)
-    installer.aggregate_targets.group_by(&:user_project).each do |project, targets|
-      targets.each do |target|
-        target.user_targets.each do |user_target|
-          self._check_no_mapbox_spm(project)
+    installer.aggregate_targets.group_by(&:user_project).each do |user_project, targets|
+      targets.each do |agg_target|
+        agg_target.user_targets.each do |_user_target|
+          self._check_no_mapbox_spm(user_project)
         end
       end
     end
@@ -201,10 +194,12 @@ $rnMapboxMapsTargetsToChangeToDynamic = rnMapboxMapsTargetsToChangeToDynamic
 
 def $RNMapboxMaps.pre_install(installer)
   installer.aggregate_targets.each do |target|
-    target.pod_targets.select { |p| $rnMapboxMapsTargetsToChangeToDynamic.include?(p.name) }.each do |mobile_events_target|
-      mobile_events_target.instance_variable_set(:@build_type,Pod::BuildType.dynamic_framework)
-      puts "* [RNMapbox] Changed #{mobile_events_target.name} to #{mobile_events_target.send(:build_type)}"
-      fail "* [RNMapbox] Unable to change build_type" unless mobile_events_target.send(:build_type) == Pod::BuildType.dynamic_framework
+    target.pod_targets
+          .select { |p| $rnMapboxMapsTargetsToChangeToDynamic.include?(p.name) }
+          .each do |pod_target|
+      pod_target.instance_variable_set(:@build_type, Pod::BuildType.dynamic_framework)
+      puts "* [RNMapbox] Changed #{pod_target.name} to #{pod_target.send(:build_type)}"
+      fail "* [RNMapbox] Unable to change build_type" unless pod_target.send(:build_type) == Pod::BuildType.dynamic_framework
     end
   end
 end
@@ -223,7 +218,7 @@ if $RNMapboxMapsDownloadToken
       mapbox_download = args.flatten.any? { |i| i.to_s.start_with?('https://api.mapbox.com') }
       if mapbox_download
         arguments = args.flatten
-        arguments.prepend("-u","mapbox:#{$RNMapboxMapsDownloadToken}")
+        arguments.prepend("-u", "mapbox:#{$RNMapboxMapsDownloadToken}")
         super(*arguments)
       else
         super
@@ -237,24 +232,24 @@ if $RNMapboxMapsDownloadToken
 end
 
 Pod::Spec.new do |s|
-  s.name		= "rnmapbox-maps"
-  s.summary		= "React Native Component for Mapbox"
-  s.version		= package['version']
-  s.authors		= { "Miklós Fazekas" => "mfazekas@szemafor.com (https://github.com/mfazekas/)" }
-  s.homepage    	= "https://github.com/rnmapbox/maps#readme"
-  s.source      	= { :git => "https://github.com/rnmapbox/maps.git" }
-  s.license     	= "MIT"
-  if $RNMapboxMapsUseV11Imp
-    s.platform    	= :ios, "12.4"
-  else
-    s.platform    	= :ios, "11.0"
-  end
-  s.header_dir = "rnmapbox_maps"
+  s.name        = "rnmapbox-maps"
+  s.summary     = "React Native Component for Mapbox"
+  s.version     = package['version']
+  s.authors     = { "Miklós Fazekas" => "mfazekas@szemafor.com (https://github.com/mfazekas/)" }
+  s.homepage    = "https://github.com/rnmapbox/maps#readme"
+  s.source      = { :git => "https://github.com/rnmapbox/maps.git" }
+  s.license     = "MIT"
 
+  s.platform    = :ios, ($RNMapboxMapsUseV11Imp ? "12.4" : "11.0")
+  s.header_dir  = "rnmapbox_maps"
+
+  # IMPORTANT:
+  # - If $RNMapboxMapsSwiftPackageManager is set, we DO NOT declare Mapbox pods here.
+  # - Mapbox dependency will be satisfied by SPM via post_install (unless "manual").
   unless $RNMapboxMapsSwiftPackageManager
     if $RNMapboxMapsCustomPods
-      $RNMapboxMapsCustomPods.each do |dependecy_spec|
-        s.dependency *dependecy_spec
+      $RNMapboxMapsCustomPods.each do |dependency_spec|
+        s.dependency(*dependency_spec)
       end
     else
       case $RNMapboxMapsImpl
@@ -263,7 +258,7 @@ Pod::Spec.new do |s|
         s.dependency 'Turf'
         s.swift_version = '5.0'
       else
-        fail "$RNMapboxMapsImpl should be mapbox but was: $RNMapboxMapsImpl"
+        fail "$RNMapboxMapsImpl should be mapbox but was: #{$RNMapboxMapsImpl}"
       end
     end
   end
@@ -275,24 +270,35 @@ Pod::Spec.new do |s|
     case $RNMapboxMapsImpl
     when 'mapbox'
       sp.source_files = "ios/RNMBX/**/*.{h,m,mm,swift}"
-      sp.private_header_files = 'ios/RNMBX/RNMBXFabricHelpers.h', 'ios/RNMBX/RNMBXFabricPropConvert.h', 'ios/RNMBX/rnmapbox_maps-Swift.pre.h', 'ios/RNMBX/Utils/RNMBXFollyConvert.h'
+      sp.private_header_files = [
+        'ios/RNMBX/RNMBXFabricHelpers.h',
+        'ios/RNMBX/RNMBXFabricPropConvert.h',
+        'ios/RNMBX/rnmapbox_maps-Swift.pre.h',
+        'ios/RNMBX/Utils/RNMBXFollyConvert.h'
+      ]
 
       if new_arch_enabled
         sp.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
         install_modules_dependencies(sp)
+
         dependencies_only_requiring_modular_headers = ["React-Fabric", "React-graphics", "React-utils", "React-debug", "glog"]
-        sp.dependencies = sp.dependencies.select { |d| !dependencies_only_requiring_modular_headers.include?(d.name) }.map {|d| [d.name, []]}.to_h
-        if $RNMapobxMaps._rn_72_or_earlier()
+        sp.dependencies = sp.dependencies
+                         .select { |d| !dependencies_only_requiring_modular_headers.include?(d.name) }
+                         .map { |d| [d.name, []] }
+                         .to_h
+
+        if $RNMapboxMaps._rn_72_or_earlier?
           $RNMapboxMaps._add_compiler_flags(sp, "-DRNMBX_RN_72=1")
         end
       end
+
       if ENV['USE_FRAMEWORKS'] || $RNMapboxMapsUseFrameworks
         $RNMapboxMaps._add_compiler_flags(sp, "-DRNMBX_USE_FRAMEWORKS=1")
       end
     else
-      fail "$RNMapboxMapsImpl should be mapbox but was: $RNMapboxMapsImpl"
+      fail "$RNMapboxMapsImpl should be mapbox but was: #{$RNMapboxMapsImpl}"
     end
   end
 
-  s.default_subspecs= ['DynamicLibrary']
+  s.default_subspecs = ['DynamicLibrary']
 end
